@@ -1,0 +1,2801 @@
+ï»¿
+#include "GameAI_Config.h"
+#include "GameAI_Strategy.h"
+#include "GameAI_Algorithm.h"
+#include "GameAI_GroupType.h"
+/*²ßÂÔÀàº¯Êı*/
+
+
+/*1.0°æ±¾²ßÂÔ Ö÷¶¯³öÅÆ ³öÒ»ÕÅ×î´óµÄÅÆ£¬±»¶¯³öÅÆ²»³ö */
+void get_PutCardList_1(GameSituation&clsGameSituation, HandCardData&clsHandCardData)
+{
+	clsHandCardData.ClearPutCardList();
+	if (clsGameSituation.nCardDroit == clsHandCardData.nOwnIndex)
+	{
+		
+		clsHandCardData.value_nPutCardList.push_back(clsHandCardData.value_nHandCardList[0]);
+
+		clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgSINGLE, clsHandCardData.value_nHandCardList[0], 1);
+		
+	}	
+	else
+	{
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+	}
+	return;
+}
+
+
+
+/*
+2.0°æ±¾²ßÂÔ ÖØÔØº¯Êı£¬Ö»ÓÃÓÚ¼ÆËã×Ô¼ºÊÖÅÆĞèÒª¼¸¸öÂÖ´Î¿ÉÒÔ³öÍê¼´ÆäÈ¨ÖµÇé¿ö 
+*/
+void get_PutCardList_2(HandCardData &clsHandCardData)
+{
+	
+	clsHandCardData.ClearPutCardList();
+
+	//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+	CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+	//Èç¹ûÄÜÒ»´ÎĞÔ³öÈ¥ÇÒÃ»ÓĞÕ¨µ¯£¬ÒòÎªÓĞÕ¨µ¯µÄ»°È¨Öµ¿ÉÄÜ»á¸ü´ó
+	if (SurCardGroupData.cgType != cgERROR&&!HasBoom(clsHandCardData.value_aHandCardList))
+	{
+			Put_All_SurCards(clsHandCardData, SurCardGroupData);
+			return;
+	}
+
+	/*ÍõÕ¨¡ª¡ªµ±Ç°²ßÂÔÖ»´¦ÀíÍõÕ¨×÷Îªµ¹ÊıµÚ¶şÊÖµÄÓÅÏÈ³öÅÆÂß¼­£¬ºóĞø°æ±¾»áÔÚ´Ë»ù´¡ÉÏÓÅ»¯*/
+	if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+	{
+
+		clsHandCardData.value_aHandCardList[17] --;
+		clsHandCardData.value_aHandCardList[16] --;
+		clsHandCardData.nHandCardCount -= 2;
+		HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+		clsHandCardData.value_aHandCardList[16] ++;
+		clsHandCardData.value_aHandCardList[17] ++;
+		clsHandCardData.nHandCardCount += 2;
+		if (tmpHandCardValue.NeedRound == 1)
+		{
+			clsHandCardData.value_nPutCardList.push_back(17);
+			clsHandCardData.value_nPutCardList.push_back(16);
+			clsHandCardData.uctPutCardType = get_GroupData(cgKING_CARD, 17, 2);
+			return;
+		}
+	}
+
+	//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+	HandCardValue BestHandCardValue;
+	BestHandCardValue.NeedRound = 20;
+	BestHandCardValue.SumValue = MinCardsValue;
+	//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+	BestHandCardValue.NeedRound += 1;
+
+	//Ôİ´æ×î¼ÑµÄ×éºÏ
+	CardGroupData BestCardGroup;
+
+	//´ø³öÈ¥µÄÅÆ
+	int tmp_1 = 0;
+	int tmp_2 = 0;
+	int tmp_3 = 0;
+	int tmp_4 = 0;
+
+	/*
+	ÓÅÏÈ´¦ÀíÈıÅÆ¡¢·É»úµÈÅÆ£¬ÒòÎªÕâÖÖÅÆĞÍ¿ÉÒÔ°ÑĞ¡ÅÆ´ø³ö,ÆäÊµÕâÀï¶Ô±È½Ï´óµÄÈı´øÒ»²»ÊÇºÜ¹«Æ½
+	ºóĞø°æ±¾¿ÉÒÔÔÚ´Ë´¦×ö·ÖÖ§´¦Àí£¬±ÈÈçËµÈı´øÒ»µÄ»°Ö»Ñ­»·µ½10£¬JÒÔÉÏÏÈ²»×Å¼±´ò³ö¡£
+	*/
+	for (int i = 3; i < 16; i++)
+	{
+		//2.0°æ±¾²ßÂÔÖ÷¶¯³öÅÆ²»²ğ·ÖÕ¨µ¯£¬ëŞ×Ô¼º´ÓÀ´¾Í²»´òËÄ´ø¶ş£¬ÒòÎªÀË
+		if (clsHandCardData.value_aHandCardList[i] != 4)
+		{
+			//³öÈı´øÒ»
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				clsHandCardData.value_aHandCardList[i] -= 3;
+				for (int j = 3; j < 18; j++)
+				{
+					if (clsHandCardData.value_aHandCardList[j] > 0 )
+					{
+						clsHandCardData.value_aHandCardList[j] -= 1;
+						clsHandCardData.nHandCardCount -= 4;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						clsHandCardData.value_aHandCardList[j] += 1;
+						clsHandCardData.nHandCardCount += 4;
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestCardGroup = get_GroupData(cgTHREE_TAKE_ONE, i, 4);
+							tmp_1 = j;
+						}
+					}
+				}
+				clsHandCardData.value_aHandCardList[i] += 3;
+			}
+			//³öÈı´ø¶ş
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				for (int j = 3; j < 16; j++)
+				{
+					clsHandCardData.value_aHandCardList[i] -= 3;
+					if (clsHandCardData.value_aHandCardList[j] > 1)
+					{
+						clsHandCardData.value_aHandCardList[j] -= 2;
+						clsHandCardData.nHandCardCount -= 5;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						clsHandCardData.value_aHandCardList[j] += 2;
+						clsHandCardData.nHandCardCount += 5;
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestCardGroup = get_GroupData(cgTHREE_TAKE_TWO, i, 5);
+							tmp_1 = j;
+						}
+					}
+					clsHandCardData.value_aHandCardList[i] += 3;
+				}
+			}
+			//³öËÄ´ø¶şµ¥
+			if (clsHandCardData.value_aHandCardList[i] > 3)
+			{
+				//2.0°æ±¾²ßÂÔÖ÷¶¯³öÅÆ²»²ğ·ÖÕ¨µ¯£¬ëŞ×Ô¼º´ÓÀ´¾Í²»´òËÄ´ø¶ş£¬ÒòÎªÀË
+			}
+			//³öËÄ´ø¶ş¶Ô
+			if (clsHandCardData.value_aHandCardList[i] > 3)
+			{
+				//2.0°æ±¾²ßÂÔÖ÷¶¯³öÅÆ²»²ğ·ÖÕ¨µ¯£¬ëŞ×Ô¼º´ÓÀ´¾Í²»´òËÄ´ø¶ş£¬ÒòÎªÀË
+			}
+			//³öÈı´øÒ»µ¥Á¬
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				int prov = 0;
+				for (int j = i; j < 15; j++)
+				{
+					if (clsHandCardData.value_aHandCardList[j] > 2)
+					{
+						prov++;
+					}
+					else
+					{
+						break;
+					}
+					/*±¾À´Ïë×öÈ«ÅÅÁĞÑ¡È¡´ø³öµÄÅÆÈ»ºóÃ¶¾Ù³ö×î¸ß¼ÛÖµµÄ£¬µ«¿¼ÂÇµ½µ±·É»ú³¤¶ÈÒ²¾ÍÊÇÔÚ2-4Ö®¼ä
+					ËùÒÔ¸É´à×öÈı¸ö·ÖÖ§´¦ÀíËãÁË*/
+					//ÎªÁ½Á¬·É»ú
+					if (prov == 2)
+					{
+
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 4;
+						for (int tmp1 = 3; tmp1 < 18; tmp1++)
+						{
+							if (clsHandCardData.value_aHandCardList[tmp1] > 0 )
+							{
+								clsHandCardData.value_aHandCardList[tmp1] -= 1;
+								for (int tmp2 = tmp1; tmp2 < 18; tmp2++)
+								{
+									if (clsHandCardData.value_aHandCardList[tmp2] > 0 )
+									{
+										clsHandCardData.value_aHandCardList[tmp2] -= 1;
+										HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+									
+										if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+										{
+											BestHandCardValue = tmpHandCardValue;
+											BestCardGroup = get_GroupData(cgTHREE_TAKE_ONE_LINE, j, prov * 4);
+											tmp_1 = tmp1;
+											tmp_2 = tmp2;
+
+										}
+										clsHandCardData.value_aHandCardList[tmp2] += 1;
+									}
+								}
+								clsHandCardData.value_aHandCardList[tmp1] += 1;
+							}
+						}
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 4;
+					}
+					//ÎªÈıÁ¬·É»ú
+					if (prov == 3)
+					{
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 4;
+						for (int tmp1 = 3; tmp1 < 18; tmp1++)
+						{
+							if (clsHandCardData.value_aHandCardList[tmp1] > 0 )
+							{
+								clsHandCardData.value_aHandCardList[tmp1] -= 1;
+								for (int tmp2 = tmp1; tmp2 < 18; tmp2++)
+								{
+									if (clsHandCardData.value_aHandCardList[tmp2] > 0 )
+									{
+										clsHandCardData.value_aHandCardList[tmp2] -= 1;
+										for (int tmp3 = tmp2; tmp3 < 18; tmp3++)
+										{
+											if (clsHandCardData.value_aHandCardList[tmp3] > 0 )
+											{
+												clsHandCardData.value_aHandCardList[tmp3] -= 1;
+
+												HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+												if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+												{
+
+													BestHandCardValue = tmpHandCardValue;
+													BestCardGroup = get_GroupData(cgTHREE_TAKE_ONE_LINE, j, prov * 4);
+													tmp_1 = tmp1;
+													tmp_2 = tmp2;
+													tmp_3 = tmp3;
+
+												}
+												clsHandCardData.value_aHandCardList[tmp3] += 1;
+											}
+
+										}
+										clsHandCardData.value_aHandCardList[tmp2] += 1;
+									}
+
+								}
+								clsHandCardData.value_aHandCardList[tmp1] += 1;
+							}
+						}
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 4;
+					}
+					//ÎªËÄÁ¬·É»ú
+					if (prov == 4)
+					{
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 4;
+						for (int tmp1 = 3; tmp1 < 18; tmp1++)
+						{
+							if (clsHandCardData.value_aHandCardList[tmp1] > 0 )
+							{
+								clsHandCardData.value_aHandCardList[tmp1] -= 1;
+								for (int tmp2 = tmp1; tmp2 < 18; tmp2++)
+								{
+									if (clsHandCardData.value_aHandCardList[tmp2] > 0 )
+									{
+										clsHandCardData.value_aHandCardList[tmp2] -= 1;
+										for (int tmp3 = tmp2; tmp3 < 18; tmp3++)
+										{
+											if (clsHandCardData.value_aHandCardList[tmp3] > 0 )
+											{
+												clsHandCardData.value_aHandCardList[tmp3] -= 1;
+												for (int tmp4 = tmp3; tmp4 < 18; tmp4++)
+												{
+													if (clsHandCardData.value_aHandCardList[tmp4] > 0 )
+													{
+														clsHandCardData.value_aHandCardList[tmp4] -= 1;
+														HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+														if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+														{
+															BestHandCardValue = tmpHandCardValue;
+															BestCardGroup = get_GroupData(cgTHREE_TAKE_ONE_LINE, j, prov * 4);
+															tmp_1 = tmp1;
+															tmp_2 = tmp2;
+															tmp_3 = tmp3;
+															tmp_4 = tmp4;
+														}
+														clsHandCardData.value_aHandCardList[tmp4] += 1;
+													}
+
+												}
+												clsHandCardData.value_aHandCardList[tmp3] += 1;
+											}
+
+										}
+										clsHandCardData.value_aHandCardList[tmp2] += 1;
+									}
+
+								}
+								clsHandCardData.value_aHandCardList[tmp1] += 1;
+							}
+						}
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 4;
+					}
+					//Èôprov==5£¬ÔòÊÇµØÖ÷¿ÉÒÔÖ±½Ó³öÈ¥£¬ÔÚ¼ôÖ¦²¿·ÖÒÑ¾­´¦Àí
+				}
+
+			}
+			//³öÈı´øÒ»Ë«Á¬
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				int prov = 0;
+				for (int j = i; j < 15; j++)
+				{
+					if (clsHandCardData.value_aHandCardList[j] > 2 )
+					{
+						prov++;
+					}
+					else
+					{
+						break;
+					}
+					/*±¾À´Ïë×öÈ«ÅÅÁĞÑ¡È¡´ø³öµÄÅÆÈ»ºóÃ¶¾Ù³ö×î¸ß¼ÛÖµµÄ£¬µ«¿¼ÂÇµ½µ±·É»ú³¤¶ÈÒ²¾ÍÊÇÔÚ2-4Ö®¼ä
+					ËùÒÔ¸É´à×öÈı¸ö·ÖÖ§´¦ÀíËãÁË*/
+					//ÎªÁ½Á¬·É»ú
+					if (prov == 2)
+					{
+
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 5;
+						for (int tmp1 = 3; tmp1 < 16; tmp1++)
+						{
+							if (clsHandCardData.value_aHandCardList[tmp1] > 1 )
+							{
+								clsHandCardData.value_aHandCardList[tmp1] -= 2;
+								for (int tmp2 = tmp1; tmp2 < 16; tmp2++)
+								{
+									if (clsHandCardData.value_aHandCardList[tmp2] > 1 )
+									{
+										clsHandCardData.value_aHandCardList[tmp2] -= 2;
+										HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+										if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+										{
+											BestHandCardValue = tmpHandCardValue;
+											BestCardGroup = get_GroupData(cgTHREE_TAKE_TWO_LINE, j, prov * 5);
+											tmp_1 = tmp1;
+											tmp_2 = tmp2;
+										}
+										clsHandCardData.value_aHandCardList[tmp2] += 2;
+									}
+								}
+								clsHandCardData.value_aHandCardList[tmp1] += 2;
+							}
+						}
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 5;
+					}
+					//ÎªÈıÁ¬·É»ú
+					if (prov == 3)
+					{
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 5;
+						for (int tmp1 = 3; tmp1 < 16; tmp1++)
+						{
+							if (clsHandCardData.value_aHandCardList[tmp1] > 1 )
+							{
+								clsHandCardData.value_aHandCardList[tmp1] -= 2;
+								for (int tmp2 = tmp1; tmp2 < 16; tmp2++)
+								{
+									if (clsHandCardData.value_aHandCardList[tmp2] > 1 )
+									{
+										clsHandCardData.value_aHandCardList[tmp2] -= 2;
+										for (int tmp3 = tmp2; tmp3 < 16; tmp3++)
+										{
+											if (clsHandCardData.value_aHandCardList[tmp3] > 1 )
+											{
+												clsHandCardData.value_aHandCardList[tmp3] -= 2;
+												HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+												if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+												{
+													BestHandCardValue = tmpHandCardValue;
+													BestCardGroup = get_GroupData(cgTHREE_TAKE_TWO_LINE, j, prov * 5);
+													tmp_1 = tmp1;
+													tmp_2 = tmp2;
+													tmp_3 = tmp3;
+												}
+												clsHandCardData.value_aHandCardList[tmp3] += 2;
+											}
+
+										}
+										clsHandCardData.value_aHandCardList[tmp2] += 2;
+									}
+
+								}
+								clsHandCardData.value_aHandCardList[tmp1] += 2;
+							}
+						}
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 5;
+					}
+					//Èôprov==4£¬ÔòÊÇµØÖ÷¿ÉÒÔÖ±½Ó³öÈ¥£¬ÔÚ¼ôÖ¦²¿·ÖÒÑ¾­´¦Àí
+				}
+			}
+		}
+
+	}
+	if (BestCardGroup.cgType == cgTHREE_TAKE_ONE)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.uctPutCardType = BestCardGroup;
+			return;
+		}
+	else if (BestCardGroup.cgType == cgTHREE_TAKE_TWO)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.uctPutCardType = BestCardGroup;
+			return;
+		}
+	else if (BestCardGroup.cgType == cgTHREE_TAKE_ONE_LINE)
+		{
+			for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount / 4) + 1; j <= BestCardGroup.nMaxCard; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+
+			if (BestCardGroup.nCount / 4 == 2)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			}
+			if (BestCardGroup.nCount / 4 == 3)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+			}
+			if (BestCardGroup.nCount / 4 == 4)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				clsHandCardData.value_nPutCardList.push_back(tmp_4);
+			}
+
+			clsHandCardData.uctPutCardType = BestCardGroup;
+			return;
+		}
+	else if (BestCardGroup.cgType == cgTHREE_TAKE_TWO_LINE)
+		{
+			for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount / 5) + 1; j <= BestCardGroup.nMaxCard; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+			if (BestCardGroup.nCount / 5 == 2)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			}
+			if (BestCardGroup.nCount / 5 == 3)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+			}
+			clsHandCardData.uctPutCardType = BestCardGroup;
+			return;
+		}
+		
+
+	//´ÎÖ®´¦Àíµ±Ç°¼ÛÖµ×îµÍµÄÅÆ£¬ÏÖÔÚ²»±ØÔÙ¿¼ÂÇÕâÕÅÅÆ¿ÉÄÜ±»ÈıÅÆ´ø³öµÈÇé¿ö
+	for (int i = 3; i < 16; i++) 
+	{
+		if (clsHandCardData.value_aHandCardList[i] != 0&& clsHandCardData.value_aHandCardList[i] != 4)
+		{
+			//³öµ¥ÅÆ
+			if (clsHandCardData.value_aHandCardList[i] > 0)
+			{
+				clsHandCardData.value_aHandCardList[i]--;
+				clsHandCardData.nHandCardCount--;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i]++;
+				clsHandCardData.nHandCardCount++;
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestCardGroup= get_GroupData(cgSINGLE, i, 1);
+				}
+			}
+			//³ö¶ÔÅÆ
+			if (clsHandCardData.value_aHandCardList[i] > 1)
+			{
+				//³¢ÊÔ´ò³öÒ»¶ÔÅÆ£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ
+				clsHandCardData.value_aHandCardList[i] -= 2;
+				clsHandCardData.nHandCardCount -= 2;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 2;
+				clsHandCardData.nHandCardCount += 2;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestCardGroup = get_GroupData(cgDOUBLE, i, 2);
+				}
+			}
+			//³öÈıÅÆ
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				clsHandCardData.value_aHandCardList[i] -= 3;
+				clsHandCardData.nHandCardCount -= 3;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 3;
+				clsHandCardData.nHandCardCount += 3;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestCardGroup = get_GroupData(cgTHREE, i, 3);
+				}
+			}
+			//³öµ¥Ë³
+			if (clsHandCardData.value_aHandCardList[i] > 0)
+			{
+				int prov = 0;
+				for (int j = i; j < 15; j++)
+				{
+					if(clsHandCardData.value_aHandCardList[j]>0)
+					{
+						prov++;
+					}
+					else
+					{
+						break;
+					}
+					if (prov >= 5)
+					{
+
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] --;
+						}
+						clsHandCardData.nHandCardCount -= prov;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] ++;
+						}
+						clsHandCardData.nHandCardCount += prov;
+
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestCardGroup = get_GroupData(cgSINGLE_LINE, j, prov);
+						}
+					}
+				}
+				
+			}
+			//³öË«Ë³
+			if (clsHandCardData.value_aHandCardList[i] > 1)
+			{
+				int prov = 0;
+				for (int j = i; j < 15; j++)
+				{
+					if (clsHandCardData.value_aHandCardList[j]>1)
+					{
+						prov++;
+					}
+					else
+					{
+						break;
+					}
+					if (prov >= 3)
+					{
+
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -=2;
+						}
+						clsHandCardData.nHandCardCount -= prov*2;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] +=2;
+						}
+						clsHandCardData.nHandCardCount += prov*2;
+
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestCardGroup = get_GroupData(cgDOUBLE_LINE, j, prov*2);
+						}
+					}
+				}
+			}
+			//³öÈıË³
+			if(clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				int prov = 0;
+				for (int j = i; j < 15; j++)
+				{
+					if (clsHandCardData.value_aHandCardList[j]>2)
+					{
+						prov++;
+					}
+					else
+					{
+						break;
+					}
+					if (prov >= 2)
+					{
+
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] -= 3;
+						}
+						clsHandCardData.nHandCardCount -= prov * 3;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						for (int k = i; k <= j; k++)
+						{
+							clsHandCardData.value_aHandCardList[k] += 3;
+						}
+						clsHandCardData.nHandCardCount += prov * 3;
+
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestCardGroup = get_GroupData(cgTHREE_LINE, j, prov * 3);
+						}
+					}
+				}
+			}
+
+			//·ÅÔÚifÄÚÊÇÒòÎªÈô´ËÊ±iÓĞÖµÄÇÃ´±ØĞëÒª·µ»ØÒ»¸ö½á¹û
+
+			if (BestCardGroup.cgType == cgERROR)
+			{
+
+			}
+			else if (BestCardGroup.cgType == cgSINGLE)
+			{
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgDOUBLE)
+			{
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE)
+			{
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgSINGLE_LINE)
+			{
+				for (int j = BestCardGroup.nMaxCard- BestCardGroup.nCount+1; j <= BestCardGroup.nMaxCard; j++)
+				{
+					clsHandCardData.value_nPutCardList.push_back(j);
+				}
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgDOUBLE_LINE)
+			{
+				for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount/2) + 1; j <= BestCardGroup.nMaxCard; j++)
+				{
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+				}
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE_LINE)
+			{
+				for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount / 3) + 1; j <= BestCardGroup.nMaxCard; j++)
+				{
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+				}
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE_TAKE_ONE)
+			{
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE_TAKE_TWO)
+			{
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(BestCardGroup.nMaxCard);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE_TAKE_ONE_LINE)
+			{
+				for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount / 4) + 1; j <= BestCardGroup.nMaxCard; j++)
+				{
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+				}
+
+				if (BestCardGroup.nCount / 4 == 2)
+				{
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				}
+				if (BestCardGroup.nCount / 4 == 3)
+				{
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+					clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				}
+				if (BestCardGroup.nCount / 4 == 4)
+				{
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+					clsHandCardData.value_nPutCardList.push_back(tmp_3);
+					clsHandCardData.value_nPutCardList.push_back(tmp_4);
+				}
+
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			else if (BestCardGroup.cgType == cgTHREE_TAKE_TWO_LINE)
+			{
+				for (int j = BestCardGroup.nMaxCard - (BestCardGroup.nCount / 5) + 1; j <= BestCardGroup.nMaxCard; j++)
+				{
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+					clsHandCardData.value_nPutCardList.push_back(j);
+				}
+				if (BestCardGroup.nCount / 5 == 2)
+				{
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				}
+				if (BestCardGroup.nCount / 5 == 3)
+				{
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_1);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+					clsHandCardData.value_nPutCardList.push_back(tmp_2);
+					clsHandCardData.value_nPutCardList.push_back(tmp_3);
+					clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				}
+				clsHandCardData.uctPutCardType = BestCardGroup;
+			}
+			return;
+		}
+	}
+	//Èç¹ûÃ»ÓĞ3-2µÄ·ÇÕ¨ÅÆ£¬Ôò¿´¿´ÓĞÃ»ÓĞµ¥Íõ
+	if (clsHandCardData.value_aHandCardList[16] == 1 && clsHandCardData.value_aHandCardList[17] == 0)
+	{
+		clsHandCardData.value_nPutCardList.push_back(16);
+		clsHandCardData.uctPutCardType = get_GroupData(cgSINGLE, 16, 1);
+		return;
+    }
+	if (clsHandCardData.value_aHandCardList[16] == 0 && clsHandCardData.value_aHandCardList[17] == 1)
+	{
+		clsHandCardData.value_nPutCardList.push_back(17);
+		clsHandCardData.uctPutCardType = get_GroupData(cgSINGLE, 17, 1);
+		return;
+	}
+	//µ¥ÍõÒ²Ã»ÓĞ£¬³öÕ¨µ¯
+	for (int i = 3; i < 16; i++)
+	{
+		if (clsHandCardData.value_aHandCardList[i] == 4)
+		{
+			clsHandCardData.value_nPutCardList.push_back(i);
+			clsHandCardData.value_nPutCardList.push_back(i);
+			clsHandCardData.value_nPutCardList.push_back(i);
+			clsHandCardData.value_nPutCardList.push_back(i);
+
+			clsHandCardData.uctPutCardType = get_GroupData(cgBOMB_CARD, i, 4);
+
+			return;
+		}
+	}
+	
+	//Òì³£´íÎó
+	clsHandCardData.uctPutCardType = get_GroupData(cgERROR, 0, 0);
+	return;
+
+}
+
+/*
+2.0°æ±¾²ßÂÔ  ¸ù¾İ³¡ÉÏĞÎÊÆ¾ö¶¨µ±Ç°Ô¤´ò³öµÄÊÖÅÆ¡ª¡ª·ÖÖ§´¦Àí
+*/
+void get_PutCardList_2(GameSituation &clsGameSituation, HandCardData &clsHandCardData)
+{
+	if (clsGameSituation.nCardDroit == clsHandCardData.nOwnIndex)
+	{
+		get_PutCardList_2_unlimit(clsGameSituation, clsHandCardData);
+	}
+	else
+	{
+		get_PutCardList_2_limit(clsGameSituation, clsHandCardData);
+	}
+	return;
+}
+
+
+/*
+2.0°æ±¾²ßÂÔ  ¸ù¾İ³¡ÉÏĞÎÊÆ¾ö¶¨µ±Ç°Ô¤´ò³öµÄÊÖÅÆ¡ª¡ª±»¶¯³öÅÆ
+*/
+void get_PutCardList_2_limit(GameSituation &clsGameSituation, HandCardData &clsHandCardData)
+{
+	clsHandCardData.ClearPutCardList();
+
+
+	/*ÍõÕ¨¡ª¡ªµ±Ç°²ßÂÔÖ»´¦ÀíÍõÕ¨×÷Îªµ¹ÊıµÚ¶şÊÖµÄÓÅÏÈ³öÅÆÂß¼­£¬ºóĞø°æ±¾»áÔÚ´Ë»ù´¡ÉÏÓÅ»¯*/
+	if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+	{
+
+		clsHandCardData.value_aHandCardList[17] --;
+		clsHandCardData.value_aHandCardList[16] --;
+		clsHandCardData.nHandCardCount -= 2;
+		HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+		clsHandCardData.value_aHandCardList[16] ++;
+		clsHandCardData.value_aHandCardList[17] ++;
+		clsHandCardData.nHandCardCount += 2;
+		if (tmpHandCardValue.NeedRound == 1)
+		{
+			clsHandCardData.value_nPutCardList.push_back(17);
+			clsHandCardData.value_nPutCardList.push_back(16);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+			return;
+		}
+	}
+
+
+	//´íÎóÅÆĞÍ  ²»³ö
+	if (clsGameSituation.uctNowCardGroup.cgType == cgERROR)
+	{
+		clsHandCardData.uctPutCardType = get_GroupData(cgERROR, 0, 0);
+		return;
+	}
+	//²»³öÅÆĞÍ£¬ÔÚ±»¶¯³öÅÆ²ßÂÔÀïÒ²ÊÇ´íÎóÊı¾İ ²»³ö
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgZERO)
+	{
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//µ¥ÅÆÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgSINGLE)
+	{
+
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgSINGLE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD|| SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}     
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard=0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+
+
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 18; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 0)
+			{
+				//³¢ÊÔ´ò³öÒ»ÕÅÅÆ£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ
+				clsHandCardData.value_aHandCardList[i]--;
+				clsHandCardData.nHandCardCount--;
+				HandCardValue tmpHandCardValue=get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i]++;
+				clsHandCardData.nHandCardCount++;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue-(BestHandCardValue.NeedRound*7)) <= (tmpHandCardValue.SumValue-(tmpHandCardValue.NeedRound*7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgSINGLE, BestMaxCard, 1);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+		
+	    //¹Ü²»ÉÏ
+	    clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+		
+
+	}
+	//¶ÔÅÆÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgDOUBLE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgDOUBLE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+		//-------------------------------------------¶ÔÅÆ-------------------------------------------
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 18; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 1)
+			{
+				//³¢ÊÔ´ò³öÒ»¶ÔÅÆ£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ
+				clsHandCardData.value_aHandCardList[i]-=2;
+				clsHandCardData.nHandCardCount-=2;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i]+=2;
+				clsHandCardData.nHandCardCount+=2;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgDOUBLE, BestMaxCard, 2);
+			return;
+		}
+
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] ==4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+				//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+		    clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//ÈıÅÆÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+		//-------------------------------------------ÈıÅÆ-------------------------------------------
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 18; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				//³¢ÊÔ´ò³öÒ»¶ÔÅÆ£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ
+				clsHandCardData.value_aHandCardList[i] -= 3;
+				clsHandCardData.nHandCardCount -= 3;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 3;
+				clsHandCardData.nHandCardCount += 3;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE, BestMaxCard, 3);
+			return;
+		}
+
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//µ¥Á¬ÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgSINGLE_LINE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgSINGLE_LINE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard
+				&&SurCardGroupData.nCount== clsGameSituation.uctNowCardGroup.nCount)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//ÑéÖ¤Ë³×ÓµÄ±êÖ¾
+		int prov = 0;
+		//Ë³×ÓÆğµã
+		int start_i = 0;
+		//Ë³×ÓÖÕµã
+		int end_i = 0;
+		//Ë³×Ó³¤¶È
+		int length = clsGameSituation.uctNowCardGroup.nCount;
+		//2ÓëÍõ²»²ÎÓëË³×Ó£¬´Óµ±Ç°ÒÑ´ò³öµÄË³×Ó×îĞ¡ÅÆÖµ+1¿ªÊ¼±éÀú
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard - length + 2; i < 15; i++)
+		{
+			/*
+			ÕâÊÇÒ»¸öÁ¬Ğø¶ÎµÄÎÊÌâ£¬Èç¹û³öÏÖÄ³ÕÅÅÆ¸öÊıÎª0£¬ÄÇÃ´±ØÈ»²»´æÔÚ¾­¹ıËûµÄË³×Ó
+			ÄÇÃ´¾Í°Ñ¼ÆÊıÆ÷ÖÃÁã£¬Èç¹û¼ÆÊıÆ÷³¤¶È´óÓÚµÈÓÚË³×Ó³¤¶È£¬¼´¿ÉÒÔ×é³ÉË³×Ó£¬ÎÒÃÇÒÔµ±Ç°ÏÂ±êiÎª×î¸ß±êÖ¾
+			¾Ù¸öÀı×Ó£º¶Ô·½ÅÆĞÍÎª34567£¬ÎÒ´Ó4±éÀúÖÁ8£¬ÈôÂú×ã£¬´ËÊ±end_i=8£¬¼´45678£¬¼ÌĞø×ßµ½9£¬Èô»¹Âú×ã£¬end_i=9
+			¼´56789£¬ÈôÃ»ÓĞ10£¬Ôòprov¹éÁã£¬ÏÂÒ»´ÎÑ­»·Èô11´æÔÚ£¬Ôòprov=1¡£
+			*/
+			if (clsHandCardData.value_aHandCardList[i] > 0)
+			{
+				prov++;
+			}
+			else
+			{
+				prov = 0;
+			}
+			if (prov >= length)
+			{
+				end_i = i;
+				start_i = i - length + 1;
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] --;
+				}
+				clsHandCardData.nHandCardCount -= clsGameSituation.uctNowCardGroup.nCount;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] ++;
+				}
+				clsHandCardData.nHandCardCount += clsGameSituation.uctNowCardGroup.nCount;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = end_i;
+					PutCards = true;
+				}
+
+			}
+		}
+			
+		if (PutCards)
+		{
+			for (int j = start_i; j <= end_i; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}		
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgSINGLE_LINE, BestMaxCard, clsGameSituation.uctNowCardGroup.nCount);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//¶ÔÁ¬ÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgDOUBLE_LINE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgDOUBLE_LINE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard
+				&&SurCardGroupData.nCount == clsGameSituation.uctNowCardGroup.nCount)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//ÑéÖ¤Ë³×ÓµÄ±êÖ¾
+		int prov = 0;
+		//Ë³×ÓÆğµã
+		int start_i = 0;
+		//Ë³×ÓÖÕµã
+		int end_i = 0;
+		//Ë³×Ó³¤¶È
+		int length = clsGameSituation.uctNowCardGroup.nCount/2;
+		//2ÓëÍõ²»²ÎÓëË³×Ó£¬´Óµ±Ç°ÒÑ´ò³öµÄË³×Ó×îĞ¡ÅÆÖµ+1¿ªÊ¼±éÀú
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard - length + 2; i < 15; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 1)
+			{
+				prov++;
+			}
+			else
+			{
+				prov = 0;
+			}
+			if (prov >= length)
+			{
+				end_i = i;
+				start_i = i - length + 1;
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] -=2;
+				}
+				clsHandCardData.nHandCardCount -= clsGameSituation.uctNowCardGroup.nCount;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] +=2;
+				}
+				clsHandCardData.nHandCardCount += clsGameSituation.uctNowCardGroup.nCount;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = end_i;
+					PutCards = true;
+				}
+
+			}
+		}
+
+		if (PutCards)
+		{
+			for (int j = start_i; j <= end_i; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgDOUBLE_LINE, BestMaxCard, clsGameSituation.uctNowCardGroup.nCount);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+
+	}
+	//ÈıÁ¬ÀàĞÍ
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE_LINE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE_LINE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard
+				&&SurCardGroupData.nCount == clsGameSituation.uctNowCardGroup.nCount)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//ÑéÖ¤Ë³×ÓµÄ±êÖ¾
+		int prov = 0;
+		//Ë³×ÓÆğµã
+		int start_i = 0;
+		//Ë³×ÓÖÕµã
+		int end_i = 0;
+		//Ë³×Ó³¤¶È
+		int length = clsGameSituation.uctNowCardGroup.nCount / 3;
+		//2ÓëÍõ²»²ÎÓëË³×Ó£¬´Óµ±Ç°ÒÑ´ò³öµÄË³×Ó×îĞ¡ÅÆÖµ+1¿ªÊ¼±éÀú
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard - length + 2; i < 15; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				prov++;
+			}
+			else
+			{
+				prov = 0;
+			}
+			if (prov >= length)
+			{
+				end_i = i;
+				start_i = i - length + 1;
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] -= 3;
+				}
+				clsHandCardData.nHandCardCount -= clsGameSituation.uctNowCardGroup.nCount;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] += 3;
+				}
+				clsHandCardData.nHandCardCount += clsGameSituation.uctNowCardGroup.nCount;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = end_i;
+					PutCards = true;
+				}
+
+			}
+		}
+
+		if (PutCards)
+		{
+			for (int j = start_i; j <= end_i; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE_LINE, BestMaxCard, clsGameSituation.uctNowCardGroup.nCount);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//Èı´øÒ»µ¥
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE_TAKE_ONE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE_TAKE_ONE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+	    		   
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//Ë³´ø³öÈ¥µÄÅÆ
+		int tmp_1 = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//Èı´øÒ»
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] >2)
+			{
+				for (int j = 3; j < 18; j++)
+				{
+					//Ñ¡³öÒ»ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñÈıÕÅµÄÄÇ¸öÅÆ
+					if (clsHandCardData.value_aHandCardList[j] > 0 && j != i)
+					{
+						clsHandCardData.value_aHandCardList[i] -= 3;
+						clsHandCardData.value_aHandCardList[j] -= 1;
+						clsHandCardData.nHandCardCount -= 4;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						clsHandCardData.value_aHandCardList[i] += 3;
+						clsHandCardData.value_aHandCardList[j] += 1;
+						clsHandCardData.nHandCardCount += 4;
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestMaxCard = i;
+							tmp_1 = j;
+							PutCards = true;
+						}
+					}
+				}
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE_TAKE_ONE, BestMaxCard, 4);
+			return;
+		}
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//Èı´øÒ»¶Ô
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE_TAKE_TWO)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE_TAKE_TWO&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//Ë³´ø³öÈ¥µÄÅÆ
+		int tmp_1 = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//Èı´øÒ»
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] >2)
+			{
+				for (int j = 3; j < 16; j++)
+				{
+					//Ñ¡³öÒ»ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñÈıÕÅµÄÄÇ¸öÅÆ
+					if (clsHandCardData.value_aHandCardList[j] > 1 && j != i)
+					{
+						clsHandCardData.value_aHandCardList[i] -= 3;
+						clsHandCardData.value_aHandCardList[j] -= 2;
+						clsHandCardData.nHandCardCount -= 5;
+						HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+						clsHandCardData.value_aHandCardList[i] += 3;
+						clsHandCardData.value_aHandCardList[j] += 2;
+						clsHandCardData.nHandCardCount += 5;
+						//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+						if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+						{
+							BestHandCardValue = tmpHandCardValue;
+							BestMaxCard = i;
+							tmp_1 = j;
+							PutCards = true;
+						}
+					}
+				}
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE_TAKE_TWO, BestMaxCard, 5);
+			return;
+		}
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//Èı´øÒ»µ¥Á¬
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE_TAKE_ONE_LINE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE_TAKE_ONE_LINE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard
+				&&SurCardGroupData.nCount == clsGameSituation.uctNowCardGroup.nCount)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//ÑéÖ¤Ë³×ÓµÄ±êÖ¾
+		int prov = 0;
+		//Ë³×ÓÆğµã
+		int start_i = 0;
+		//Ë³×ÓÖÕµã
+		int end_i = 0;
+		//Ë³×Ó³¤¶È
+		int length = clsGameSituation.uctNowCardGroup.nCount / 4;
+
+		int tmp_1 = 0;
+		int tmp_2 = 0;
+		int tmp_3 = 0;
+		int tmp_4 = 0;
+		//2ÓëÍõ²»²ÎÓëË³×Ó£¬´Óµ±Ç°ÒÑ´ò³öµÄË³×Ó×îĞ¡ÅÆÖµ+1¿ªÊ¼±éÀú
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard - length + 2; i < 15; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				prov++;
+			}
+			else
+			{
+				prov = 0;
+			}
+			if (prov >= length)
+			{
+				end_i = i;
+				start_i = i - length + 1;
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] -= 3;
+				}			
+				clsHandCardData.nHandCardCount -= clsGameSituation.uctNowCardGroup.nCount;
+
+				/*±¾À´Ïë×öÈ«ÅÅÁĞÑ¡È¡´ø³öµÄÅÆÈ»ºóÃ¶¾Ù³ö×î¸ß¼ÛÖµµÄ£¬µ«¿¼ÂÇµ½µ±·É»ú³¤¶ÈÒ²¾ÍÊÇÔÚ2-4Ö®¼ä
+				ËùÒÔ¸É´à×öÈı¸ö·ÖÖ§´¦ÀíËãÁË*/
+				//ÎªÁ½Á¬·É»ú
+				if (length == 2)
+				{
+					for (int j = 3; j < 18; j++)
+					{
+						if (clsHandCardData.value_aHandCardList[j] > 0)
+						{
+							clsHandCardData.value_aHandCardList[j] -= 1;
+							for (int k = 3; k < 18; k++)
+							{
+								if (clsHandCardData.value_aHandCardList[k] > 0)
+								{
+									clsHandCardData.value_aHandCardList[k] -= 1;
+									HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+									clsHandCardData.value_aHandCardList[k] += 1;
+
+									//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+									if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+									{
+										BestHandCardValue = tmpHandCardValue;
+										BestMaxCard = end_i;
+										tmp_1 = j;
+										tmp_2 = k;
+										PutCards = true;
+									}
+								}
+							}
+							clsHandCardData.value_aHandCardList[j] += 1;
+						}
+
+					}
+				}
+				//ÎªÈıÁ¬·É»ú
+				if (length == 3)
+				{
+					for (int j = 3; j < 18; j++)
+					{
+						if (clsHandCardData.value_aHandCardList[j] > 0)
+						{
+							clsHandCardData.value_aHandCardList[j] -= 1;
+							for (int k = 3; k < 18; k++)
+							{
+								if (clsHandCardData.value_aHandCardList[k] > 0)
+								{
+									clsHandCardData.value_aHandCardList[k] -= 1;
+									for (int l = 3; l < 18; l++)
+									{
+										if (clsHandCardData.value_aHandCardList[l] > 0)
+										{
+											clsHandCardData.value_aHandCardList[l] -= 1;
+											HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+											//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+											if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+											{
+												BestHandCardValue = tmpHandCardValue;
+												BestMaxCard = end_i;
+												tmp_1 = j;
+												tmp_2 = k;
+												tmp_3 = l;
+												PutCards = true;
+											}
+											clsHandCardData.value_aHandCardList[l] += 1;
+										}
+									}
+									clsHandCardData.value_aHandCardList[k] += 1;
+								}
+							}
+							clsHandCardData.value_aHandCardList[j] += 1;
+						}
+						
+
+					}
+				}
+				//ÎªËÄÁ¬·É»ú
+				if (length == 4)
+				{
+					for (int j = 3; j < 18; j++)
+					{
+						if (clsHandCardData.value_aHandCardList[j] > 0)
+						{
+							clsHandCardData.value_aHandCardList[j] -= 1;
+							for (int k = 3; k < 18; k++)
+							{
+								if (clsHandCardData.value_aHandCardList[k] > 0)
+								{
+									clsHandCardData.value_aHandCardList[k] -= 1;
+									for (int l = 3; l < 18; l++)
+									{
+										if (clsHandCardData.value_aHandCardList[l] > 0)
+										{
+											clsHandCardData.value_aHandCardList[l] -= 1;
+											for (int m = 3; m < 18; m++)
+											{
+												if (clsHandCardData.value_aHandCardList[m] > 0)
+												{
+													clsHandCardData.value_aHandCardList[m] -= 1;
+													HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+													//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+													if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+													{
+														BestHandCardValue = tmpHandCardValue;
+														BestMaxCard = end_i;
+														tmp_1 = j;
+														tmp_2 = k;
+														tmp_3 = l;
+														tmp_4 = m;
+														PutCards = true;
+													}
+													clsHandCardData.value_aHandCardList[m] += 1;
+												}
+											}
+											clsHandCardData.value_aHandCardList[l] += 1;
+										}
+									}
+									clsHandCardData.value_aHandCardList[k] += 1;
+								}
+							}
+							clsHandCardData.value_aHandCardList[j] += 1;
+						}
+
+
+					}
+				}
+			
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] += 3;
+				}
+				clsHandCardData.nHandCardCount += clsGameSituation.uctNowCardGroup.nCount;
+			}
+		}
+
+		if (PutCards)
+		{
+			for (int j = start_i; j <= end_i; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+
+			if (length == 2)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+		    }
+			if (length == 3)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+
+			}
+			if (length == 4)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				clsHandCardData.value_nPutCardList.push_back(tmp_4);
+			}
+
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE_TAKE_ONE_LINE, BestMaxCard, clsGameSituation.uctNowCardGroup.nCount);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//Èı´øÒ»¶ÔÁ¬
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgTHREE_TAKE_TWO_LINE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgTHREE_TAKE_TWO_LINE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard
+				&&SurCardGroupData.nCount == clsGameSituation.uctNowCardGroup.nCount)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+
+
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//ÑéÖ¤Ë³×ÓµÄ±êÖ¾
+		int prov = 0;
+		//Ë³×ÓÆğµã
+		int start_i = 0;
+		//Ë³×ÓÖÕµã
+		int end_i = 0;
+		//Ë³×Ó³¤¶È
+		int length = clsGameSituation.uctNowCardGroup.nCount / 5;
+
+		int tmp_1 = 0;
+		int tmp_2 = 0;
+		int tmp_3 = 0;
+		//2ÓëÍõ²»²ÎÓëË³×Ó£¬´Óµ±Ç°ÒÑ´ò³öµÄË³×Ó×îĞ¡ÅÆÖµ+1¿ªÊ¼±éÀú
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard - length + 2; i < 15; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] > 2)
+			{
+				prov++;
+			}
+			else
+			{
+				prov = 0;
+			}
+			if (prov >= length)
+			{
+				end_i = i;
+				start_i = i - length + 1;
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] -= 3;
+				}
+				clsHandCardData.nHandCardCount -= clsGameSituation.uctNowCardGroup.nCount;
+
+				/*±¾À´Ïë×öÈ«ÅÅÁĞÑ¡È¡´ø³öµÄÅÆÈ»ºóÃ¶¾Ù³ö×î¸ß¼ÛÖµµÄ£¬µ«¿¼ÂÇµ½µ±·É»ú³¤¶ÈÒ²¾ÍÊÇÔÚ2-3Ö®¼ä*/
+				//ÎªÁ½Á¬·É»ú
+				if (length == 2)
+				{
+					for (int j = 3; j < 18; j++)
+					{
+						if (clsHandCardData.value_aHandCardList[j] > 1)
+						{
+							clsHandCardData.value_aHandCardList[j] -= 2;
+							for (int k = 3; k < 18; k++)
+							{
+								if (clsHandCardData.value_aHandCardList[k] > 1)
+								{
+									clsHandCardData.value_aHandCardList[k] -= 2;
+									HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+									clsHandCardData.value_aHandCardList[k] += 2;
+
+									//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+									if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+									{
+										BestHandCardValue = tmpHandCardValue;
+										BestMaxCard = end_i;
+										tmp_1 = j;
+										tmp_2 = k;
+										PutCards = true;
+									}
+								}
+							}
+							clsHandCardData.value_aHandCardList[j] += 2;
+						}
+
+					}
+				}
+				//ÎªÈıÁ¬·É»ú
+				if (length == 3)
+				{
+					for (int j = 3; j < 18; j++)
+					{
+						if (clsHandCardData.value_aHandCardList[j] > 1)
+						{
+							clsHandCardData.value_aHandCardList[j] -= 2;
+							for (int k = 3; k < 18; k++)
+							{
+								if (clsHandCardData.value_aHandCardList[k] > 1)
+								{
+									clsHandCardData.value_aHandCardList[k] -= 2;
+									for (int l = 3; l < 18; l++)
+									{
+										if (clsHandCardData.value_aHandCardList[l] > 1)
+										{
+											clsHandCardData.value_aHandCardList[l] -= 2;
+											HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+											//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+											if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+											{
+												BestHandCardValue = tmpHandCardValue;
+												BestMaxCard = end_i;
+												tmp_1 = j;
+												tmp_2 = k;
+												tmp_3 = l;
+												PutCards = true;
+											}
+											clsHandCardData.value_aHandCardList[l] += 2;
+										}
+									}
+									clsHandCardData.value_aHandCardList[k] += 2;
+								}
+							}
+							clsHandCardData.value_aHandCardList[j] += 2;
+						}
+
+
+					}
+				}
+
+				for (int j = start_i; j <= end_i; j++)
+				{
+					clsHandCardData.value_aHandCardList[j] += 3;
+				}
+				clsHandCardData.nHandCardCount += clsGameSituation.uctNowCardGroup.nCount;
+			}
+		}
+
+		if (PutCards)
+		{
+			for (int j = start_i; j <= end_i; j++)
+			{
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+				clsHandCardData.value_nPutCardList.push_back(j);
+			}
+
+			if (length == 2)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			}
+			if (length == 3)
+			{
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_1);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_2);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+				clsHandCardData.value_nPutCardList.push_back(tmp_3);
+
+			}
+
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgTHREE_TAKE_ONE_LINE, BestMaxCard, clsGameSituation.uctNowCardGroup.nCount);
+			return;
+		}
+
+		//-------------------------------------------Õ¨µ¯-------------------------------------------
+
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+
+				//³¢ÊÔ´ò³öÕ¨µ¯£¬¹ÀËãÊ£ÓàÊÖÅÆ¼ÛÖµ,ÒòÎªÕ¨µ¯¿ÉÒÔ²ÎÓëË³×Ó£¬²»ÄÜÒòÎªÓ°ÏìË³×Ó¶øÈÎÒâ³öÕ¨
+				clsHandCardData.value_aHandCardList[i] -= 4;
+				clsHandCardData.nHandCardCount -= 4;
+				HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+				clsHandCardData.value_aHandCardList[i] += 4;
+				clsHandCardData.nHandCardCount += 4;
+
+				//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+				if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7))
+					//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ
+					|| tmpHandCardValue.SumValue > 0)
+				{
+					BestHandCardValue = tmpHandCardValue;
+					BestMaxCard = i;
+					PutCards = true;
+				}
+
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, BestMaxCard, 4);
+			return;
+		}
+
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+			//Èç¹ûÊ£ÓàÊÖÅÆ¼ÛÖµÎªÕı£¬Ö¤Ã÷³öÈ¥µÄ¼¸ÂÊºÜ´ó£¬ÄÇÃ´¿ÉÒÔÓÃÕ¨»ñµÃÏÈÊÖ£¬ÍõÕ¨20·Ö
+			if (BestHandCardValue.SumValue > 20)
+			{
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+				return;
+			}
+		}
+
+
+
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//ËÄ´øÁ½µ¥
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgFOUR_TAKE_ONE)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgFOUR_TAKE_ONE&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+		/*ÏÂÎÄÖĞËµµ½£¬±¾²ßÂÔ¶ÔÓÚÕâÖÖÅÆĞÍÓĞÕ¨±ØÕ¨£¬ËÄ´ø¶şÏà±ÈÕ¨µ¯À´Ëµ»á¶à´ø³öÁ½ÊÖÅÆ£¬¼´×î¶àÌá¸ß14È¨ÖµµÄ¼ÛÖµ
+		Èôµ±Ç°ÊÖÅÆ¼ÛÖµ´óÓÚ14£¬¼´ÈÏÎªÎÒÃÇÄÜÕ¨¼´Õ¨£¬²»±Ø¿¼ÂÇËÄ´ø¶şµÄÊÕÒæ£¬¾ÍÊÇÕâÃ´ÈÎĞÔ¡£*/
+
+		if (BestHandCardValue.SumValue > 14)
+		{
+			//Õ¨µ¯¡ª¡ªÕâÀïÖ±½ÓÕ¨£¬²»¿¼ÂÇ²ğ·Öºó¹û¡£ÒòÎªĞÅÑö¡£
+			for (int i = 3; i < 16; i++)
+			{
+				if (clsHandCardData.value_aHandCardList[i] == 4)
+				{
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+
+					clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, i, 4);
+
+					return;
+				}
+			}
+			//ÍõÕ¨
+			if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+			{
+
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+
+				return;
+			}
+		}
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//Ë³´ø³öÈ¥µÄÅÆ
+		int tmp_1 = 0;
+		int tmp_2 = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//Í¬ÎªËÄ´ø¶ş
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+				for (int j = 3; j < 18; j++)
+				{
+					//ÏÈÑ¡³öÒ»ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñËÄÕÅµÄÄÇ¸öÅÆ
+					if (clsHandCardData.value_aHandCardList[j] > 0 && j != i)
+					{
+						//ÔÙÑ¡³öÒ»ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñËÄÕÅµÄÄÇ¸öÅÆÇÒ²»ÊÇµÚÒ»´ÎÑ¡µÄÁ½ÕÅÄÚ¸öÅÆ£¨²ßÂÔÀïËÄ´ø¶ş²»ÔÊĞí´øÒ»¶Ô,»¹²»ÈçÕ¨£©
+						for (int k = j + 1; k < 18; k++)
+						{
+							if (clsHandCardData.value_aHandCardList[k] > 0 && k != i)
+							{
+								clsHandCardData.value_aHandCardList[i] -= 4;
+								clsHandCardData.value_aHandCardList[j] -= 1;
+								clsHandCardData.value_aHandCardList[k] -= 1;
+								clsHandCardData.nHandCardCount -= 6;
+								HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+								clsHandCardData.value_aHandCardList[i] += 4;
+								clsHandCardData.value_aHandCardList[j] += 1;
+								clsHandCardData.value_aHandCardList[k] += 1;
+								clsHandCardData.nHandCardCount += 6;
+
+								//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+								if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+								{
+									BestHandCardValue = tmpHandCardValue;
+									BestMaxCard = i;
+									tmp_1 = j;
+									tmp_2 = k;
+									PutCards = true;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgFOUR_TAKE_ONE, BestMaxCard, 6);
+			return;
+		}
+		//ÕâÀïÊÇÔÚÅÄÈ¨Öµ½ÏĞ¡µÄÇé¿ö£¬ÇÒÃ»ÓĞÑ¡Ôñ³öÁ¼ºÃµÄËÄ´ø¶şÅÆĞÍ£¬ÄÇÃ´Ò²ÒªÕ¨£¬ÒòÎªĞÅÑö¡£
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, i, 4);
+
+				return;
+			}
+		}
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+
+			clsHandCardData.value_nPutCardList.push_back(17);
+			clsHandCardData.value_nPutCardList.push_back(16);
+
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+
+			return;
+		}
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//ËÄ´øÁ½¶Ô
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgFOUR_TAKE_TWO)
+	{
+		//¼ôÖ¦£ºÈç¹ûÄÜ³öÈ¥×îºóÒ»ÊÖÅÆÖ±½Ó³ö
+		CardGroupData SurCardGroupData = ins_SurCardsType(clsHandCardData.value_aHandCardList);
+		if (SurCardGroupData.cgType != cgERROR)
+		{
+			if (SurCardGroupData.cgType == cgFOUR_TAKE_TWO&&SurCardGroupData.nMaxCard>clsGameSituation.uctNowCardGroup.nMaxCard)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+			else if (SurCardGroupData.cgType == cgBOMB_CARD || SurCardGroupData.cgType == cgKING_CARD)
+			{
+				Put_All_SurCards(clsGameSituation, clsHandCardData, SurCardGroupData);
+				return;
+			}
+		}
+
+		//Ôİ´æ×î¼ÑµÄ¼ÛÖµ
+		HandCardValue BestHandCardValue = get_HandCardValue(clsHandCardData);
+		/*ÏÂÎÄÖĞËµµ½£¬±¾²ßÂÔ¶ÔÓÚÕâÖÖÅÆĞÍÓĞÕ¨±ØÕ¨£¬ËÄ´ø¶şÏà±ÈÕ¨µ¯À´Ëµ»á¶à´ø³öÁ½ÊÖÅÆ£¬¼´×î¶àÌá¸ß14È¨ÖµµÄ¼ÛÖµ
+		Èôµ±Ç°ÊÖÅÆ¼ÛÖµ´óÓÚ14£¬¼´ÈÏÎªÎÒÃÇÄÜÕ¨¼´Õ¨£¬²»±Ø¿¼ÂÇËÄ´ø¶şµÄÊÕÒæ£¬¾ÍÊÇÕâÃ´ÈÎĞÔ¡£*/
+
+		if (BestHandCardValue.SumValue > 14)
+		{
+			//Õ¨µ¯¡ª¡ªÕâÀïÖ±½ÓÕ¨£¬²»¿¼ÂÇ²ğ·Öºó¹û¡£ÒòÎªĞÅÑö¡£
+			for (int i = 3; i < 16; i++)
+			{
+				if (clsHandCardData.value_aHandCardList[i] == 4)
+				{
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+					clsHandCardData.value_nPutCardList.push_back(i);
+
+					clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, i, 4);
+
+					return;
+				}
+			}
+			//ÍõÕ¨
+			if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+			{
+
+				clsHandCardData.value_nPutCardList.push_back(17);
+				clsHandCardData.value_nPutCardList.push_back(16);
+
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+
+				return;
+			}
+		}
+		//ÎÒÃÇÈÏÎª²»³öÅÆµÄ»°»áÈÃ¶ÔÊÖÒ»¸öÂÖ´Î£¬¼´¼ÓÒ»ÂÖ£¨È¨Öµ¼õÉÙ7£©±ãÓÚºóĞøµÄ¶Ô±È²Î¿¼¡£
+		BestHandCardValue.NeedRound += 1;
+		//Ôİ´æ×î¼ÑµÄÅÆºÅ
+		int BestMaxCard = 0;
+		//Ë³´ø³öÈ¥µÄÅÆ
+		int tmp_1 = 0;
+		int tmp_2 = 0;
+		//ÊÇ·ñ³öÅÆµÄ±êÖ¾
+		bool PutCards = false;
+		//Í¬ÎªËÄ´ø¶ş
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+				for (int j = 3; j < 16; j++)
+				{
+					//ÏÈÑ¡³öÁ½ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñËÄÕÅµÄÄÇ¸öÅÆ
+					if (clsHandCardData.value_aHandCardList[j] > 1 && j != i)
+					{
+						//ÔÙÑ¡³öÁ½ÕÅÒÔÉÏµÄÅÆÇÒ²»ÊÇÑ¡ÔñËÄÕÅµÄÄÇ¸öÅÆÇÒ²»ÊÇµÚÒ»´ÎÑ¡µÄÁ½ÕÅÄÚ¸öÅÆ
+						for (int k = j + 1; k < 16; k++)
+						{
+							if (clsHandCardData.value_aHandCardList[k] > 1 && k != i) 
+							{
+								clsHandCardData.value_aHandCardList[i] -= 4;
+								clsHandCardData.value_aHandCardList[j] -= 2;
+								clsHandCardData.value_aHandCardList[k] -= 2;
+								clsHandCardData.nHandCardCount -= 8;
+								HandCardValue tmpHandCardValue = get_HandCardValue(clsHandCardData);
+								clsHandCardData.value_aHandCardList[i] += 4;
+								clsHandCardData.value_aHandCardList[j] += 2;
+								clsHandCardData.value_aHandCardList[k] += 2;
+								clsHandCardData.nHandCardCount += 8;
+
+								//Ñ¡È¡×ÜÈ¨Öµ-ÂÖ´Î*7Öµ×î¸ßµÄ²ßÂÔ  ÒòÎªÎÒÃÇÈÏÎªÊ£ÓàµÄÊÖÅÆĞèÒªn´Î¿ØÊÖµÄ»ú»á²ÅÄÜ³öÍê£¬ÈôÂÖ´ÎÅÆĞÍºÜ´ó£¨ÈçÕ¨µ¯£© ÔòÆä-7µÄ¼ÛÖµÒ²»áÎªÕı
+								if ((BestHandCardValue.SumValue - (BestHandCardValue.NeedRound * 7)) <= (tmpHandCardValue.SumValue - (tmpHandCardValue.NeedRound * 7)))
+								{
+									BestHandCardValue = tmpHandCardValue;
+									BestMaxCard = i;
+									tmp_1 = j;
+									tmp_2 = k;
+									PutCards = true;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if (PutCards)
+		{
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(BestMaxCard);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.value_nPutCardList.push_back(tmp_1);
+			clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			clsHandCardData.value_nPutCardList.push_back(tmp_2);
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgFOUR_TAKE_TWO, BestMaxCard, 8);
+			return;
+		}
+        //ÕâÀïÊÇÔÚÅÄÈ¨Öµ½ÏĞ¡µÄÇé¿ö£¬ÇÒÃ»ÓĞÑ¡Ôñ³öÁ¼ºÃµÄËÄ´ø¶şÅÆĞÍ£¬ÄÇÃ´Ò²ÒªÕ¨£¬ÒòÎªĞÅÑö¡£
+		for (int i = 3; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, i, 4);
+
+				return;
+			}
+		}
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+
+			clsHandCardData.value_nPutCardList.push_back(17);
+			clsHandCardData.value_nPutCardList.push_back(16);
+
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+
+			return;
+		}
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+
+	}
+	//Õ¨µ¯ÀàĞÍ 
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgBOMB_CARD)
+	{
+		//¸ü´óµÄÕ¨µ¯¡ª¡ªÕâÀïÖ±½ÓÕ¨£¬²»¿¼ÂÇ²ğ·Öºó¹û¡£ÒòÎªĞÅÑö¡£
+		for (int i = clsGameSituation.uctNowCardGroup.nMaxCard + 1; i < 16; i++)
+		{
+			if (clsHandCardData.value_aHandCardList[i] == 4)
+			{
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+				clsHandCardData.value_nPutCardList.push_back(i);
+
+				clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgBOMB_CARD, i, 4);
+
+				return;
+			}
+		}
+		//ÍõÕ¨
+		if (clsHandCardData.value_aHandCardList[17] > 0 && clsHandCardData.value_aHandCardList[16] > 0)
+		{
+
+			clsHandCardData.value_nPutCardList.push_back(17);
+			clsHandCardData.value_nPutCardList.push_back(16);
+
+			clsHandCardData.uctPutCardType = clsGameSituation.uctNowCardGroup = get_GroupData(cgKING_CARD, 17, 2);
+
+			return;
+		}
+		//¹Ü²»ÉÏ
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+		
+	}
+	//ÍõÕ¨ÀàĞÍ ÈË¶¼ÍõÕ¨ÁËÄã»¹³ö¸öÃ«
+	else if (clsGameSituation.uctNowCardGroup.cgType == cgKING_CARD)
+	{
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+		return;
+	}
+	//Òì³£´¦Àí ²»³ö
+	else
+	{
+		clsHandCardData.uctPutCardType = get_GroupData(cgZERO, 0, 0);
+	}
+	return;
+}
+
+/*
+2.0°æ±¾²ßÂÔ  ¸ù¾İ³¡ÉÏĞÎÊÆ¾ö¶¨µ±Ç°Ô¤´ò³öµÄÊÖÅÆ¡ª¡ªÖ÷¶¯³öÅÆ
+*/
+void get_PutCardList_2_unlimit(GameSituation &clsGameSituation, HandCardData &clsHandCardData)
+{
+	//2.0°æ±¾ÔİÊ±Ö»¿¼ÂÇ×ÔÉíÊÖÅÆÀûÒæµÄÇé¿ö
+	get_PutCardList_2(clsHandCardData);
+
+	clsGameSituation.uctNowCardGroup = clsHandCardData.uctPutCardType;
+}

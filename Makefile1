@@ -1,0 +1,23 @@
+SOURCES = $(wildcard *.cpp)
+GCC := g++
+EXEC := main
+CFLAGE := -std=c++11 -I./lua/ -L./lua/ -llua -ldl
+
+all: $(SOURCES)
+	$(GCC) $? $(CFLAGE) -o $(EXEC)
+
+.PHONY:clean
+clean: $(EXEC)
+	$(RM) $?
+
+
+
+
+
+
+
+
+
+
+
+
